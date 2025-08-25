@@ -1,8 +1,13 @@
 {
-  "name": "PLVLiveScenesPluginHelper",
+  "name": "plv-live-scense-plugin-helper",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "module": "./dist/index.mjs",
+  "main": "./dist/index.js",
+  "exports": {
+    "import": "./dist/index.mjs",
+    "require": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsdown"
   },
@@ -11,6 +16,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.11.0",
   "devDependencies": {
+    "@types/node": "^24.3.0",
     "tsdown": "^0.14.1",
     "typescript": "^5.9.2"
   }

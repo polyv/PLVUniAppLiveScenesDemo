@@ -11,6 +11,11 @@ declare const uni: any;
  */
 const Logger = createLogger("PLVLiveScenesPlugin");
 
+type NativeResult = { isSuccess?: boolean; errMsg?: string; [k: string]: any };
+const enum SceneType {
+  CloudClass = 1,
+  Shopping = 2,
+}
 /**
  * 观看者信息
  */
@@ -40,7 +45,7 @@ export type UserInfo = {
  * 直播房间登录参数
  */
 export type LiveRoomParams = {
-  sceneType: number;
+  sceneType: SceneType;
   channelId: string;
 };
 
@@ -48,15 +53,12 @@ export type LiveRoomParams = {
  * 回放房间登录参数
  */
 export type PlaybackRoomParams = {
-  sceneType: number;
+  sceneType: SceneType;
   channelId: string;
   videoId?: string;
   vodType: number | string;
 };
 
-/**
- * PLVLiveScenesPlugin 主类（与 Demo 中保持一致的 API）
- */
 /**
  * Polyv Live Scenes 辅助插件
  *
@@ -68,8 +70,8 @@ export class PLVLiveScenesPlugin {
   private configModule: any;
   private isInit = false;
   private userinfoDone = false;
-  private os: string;
-  private platform: string;
+  private os: string = "unknown";
+  private platform: string = "unknown";
   private envInit = false;
 
   /**
@@ -77,17 +79,41 @@ export class PLVLiveScenesPlugin {
    * - 通过 uni.requireNativePlugin 绑定原生模块
    */
   constructor() {
-    this.platform = uni.getSystemInfoSync().uniPlatform || "unknown";
-    this.os = uni.getSystemInfoSync().osName || "unknown";
     this.init();
   }
 
+  /**
+   * 将 uni-app 回调风格的 API 转换为 Promise
+   * @param action - 接受回调作为最后一个参数的函数
+   * @returns Promise
+   */
+  private _promisify<T>(
+    action: (cb: (res: NativeResult) => void) => void
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      action((res: NativeResult = {}) => {
+        // 默认空对象防止解构错误
+        const { isSuccess, errMsg = "", ...data } = res;
+        if (isSuccess) {
+          resolve(data as T);
+        } else {
+          reject(new Error(errMsg || "Native module call failed"));
+        }
+      });
+    });
+  }
+
   private init() {
-    if (!uni) {
+    if (typeof uni === "undefined") {
       Logger.error("运行环境错误：仅支持uni-app");
       throw new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR);
     }
-    if (this.platform !== "app") {
+    const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {};
+    this.platform = sys.uniPlatform || this.platform;
+    this.os = sys.osName || this.os;
+
+    // 兼容可能的标识（如 app）
+    if (!(this.platform === "app")) {
       Logger.error("运行环境错误：仅支持uni-app app模式");
       throw new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR);
     }
@@ -105,6 +131,18 @@ export class PLVLiveScenesPlugin {
   }
 
   /**
+   * 环境就绪校验：仅允许在 uni-app App(iOS/Android) 模式下调用
+   *
+   * 抛出：RUNTIME_ENV_ERROR
+   */
+  private ensureEnv(): void {
+    if (!this.envInit) {
+      Logger.error("运行环境错误：仅支持uni-app app模式");
+      throw new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR);
+    }
+  }
+
+  /**
    * 设置观看者信息
    *
    * @param {Object} params - 观看者信息对象
@@ -114,40 +152,29 @@ export class PLVLiveScenesPlugin {
    * @returns {Promise<void>} - 成功时 resolve，无返回值
    * @throws {Error} 当参数缺失时会直接抛出错误（Promise 将被 reject）
    */
-  setViewerInfo({
+  async setViewerInfo({
     viewerId,
     viewerName,
     viewerAvatar,
   }: ViewerInfo): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.envInit) {
-        reject(new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR));
-        return;
-      }
-      if (!viewerId || !viewerName || !viewerAvatar) {
-        reject(new Error(ERROR_MESSAGES.VIEWER_PARAMS_ERROR));
-        return;
-      }
+    this.ensureEnv();
+    if (!viewerId || !viewerName || !viewerAvatar) {
+      throw new Error(ERROR_MESSAGES.VIEWER_PARAMS_ERROR);
+    }
 
-      Logger.info("设置观看者信息", { viewerId, viewerName });
-      this.configModule.setViewerInfo(
-        {
-          viewerId,
-          viewerName,
-          viewerAvatar,
-        },
-        (res: any) => {
-          const { isSuccess, errMsg = "" } = res || {};
-          if (isSuccess) {
-            Logger.info("设置观看者信息成功");
-            resolve();
-          } else {
-            Logger.error("设置观看者信息失败", errMsg);
-            reject(errMsg);
-          }
-        }
+    Logger.info("设置观看者信息", { viewerId, viewerName });
+    try {
+      await this._promisify<void>((cb) =>
+        this.configModule.setViewerInfo(
+          { viewerId, viewerName, viewerAvatar },
+          cb
+        )
       );
-    });
+      Logger.info("设置观看者信息成功");
+    } catch (error) {
+      Logger.error("设置观看者信息失败", error);
+      throw error;
+    }
   }
 
   /**
@@ -157,24 +184,18 @@ export class PLVLiveScenesPlugin {
    * @param {string} [params.code] - 跑马灯自定义代码（可选）
    * @returns {Promise<void>} - 成功时 resolve，无返回值
    */
-  setMarqueeConfig({ code = "" }: MarqueeConfig): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.envInit) {
-        reject(new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR));
-        return;
-      }
-      Logger.info("设置跑马灯配置", { code });
-      this.configModule.setMarqueeConfig({ code }, (res: any) => {
-        const { isSuccess, errMsg = "" } = res || {};
-        if (isSuccess) {
-          Logger.info("设置跑马灯配置成功");
-          resolve();
-        } else {
-          Logger.error("设置跑马灯配置失败", errMsg);
-          reject(errMsg);
-        }
-      });
-    });
+  async setMarqueeConfig({ code = "" }: MarqueeConfig): Promise<void> {
+    this.ensureEnv();
+    Logger.info("设置跑马灯配置", { code });
+    try {
+      await this._promisify<void>((cb) =>
+        this.configModule.setMarqueeConfig({ code }, cb)
+      );
+      Logger.info("设置跑马灯配置成功");
+    } catch (error) {
+      Logger.error("设置跑马灯配置失败", error);
+      throw error;
+    }
   }
 
   /**
@@ -199,10 +220,8 @@ export class PLVLiveScenesPlugin {
     viewerAvatar,
     code = "",
   }: ViewerInfo & MarqueeConfig): Promise<void> {
-    if (!this.envInit) {
-      return Promise.reject(new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR));
-    }
     try {
+      this.ensureEnv();
       this.isInit = false;
       Logger.info("开始初始化服务");
 
@@ -260,42 +279,28 @@ export class PLVLiveScenesPlugin {
    * @returns {Promise<void>} - 成功时 resolve，无返回值
    * @throws {Error} 未初始化或参数缺失时抛出错误（Promise 将被 reject）
    */
-  setUserInfo({ appId, userId, appSecret }: UserInfo): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.envInit) {
-        reject(new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR));
-        return;
-      }
-      try {
-        this.userinfoDone = false;
+  async setUserInfo({ appId, userId, appSecret }: UserInfo): Promise<void> {
+    this.ensureEnv();
+    this.userinfoDone = false;
 
-        if (!this.isInit) {
-          throw new Error(ERROR_MESSAGES.NOT_INITIALIZED);
-        }
-        if (!appId || !userId || !appSecret) {
-          throw new Error(ERROR_MESSAGES.USER_PARAMS_ERROR);
-        }
+    if (!this.isInit) {
+      throw new Error(ERROR_MESSAGES.NOT_INITIALIZED);
+    }
+    if (!appId || !userId || !appSecret) {
+      throw new Error(ERROR_MESSAGES.USER_PARAMS_ERROR);
+    }
 
-        Logger.info("设置用户信息", { appId, userId });
-        this.configModule.setConfig(
-          { appId, userId, appSecret },
-          (result: any) => {
-            const { isSuccess, errMsg = "" } = result || {};
-            if (isSuccess) {
-              this.userinfoDone = true;
-              Logger.info("设置用户信息成功");
-              resolve();
-            } else {
-              Logger.error("设置用户信息失败", errMsg);
-              reject(errMsg);
-            }
-          }
-        );
-      } catch (error) {
-        Logger.error("设置用户信息失败", error);
-        reject(error);
-      }
-    });
+    Logger.info("设置用户信息", { appId, userId });
+    try {
+      await this._promisify<void>((cb) =>
+        this.configModule.setConfig({ appId, userId, appSecret }, cb)
+      );
+      this.userinfoDone = true;
+      Logger.info("设置用户信息成功");
+    } catch (error) {
+      Logger.error("设置用户信息失败", error);
+      throw error;
+    }
   }
 
   /**
@@ -309,40 +314,25 @@ export class PLVLiveScenesPlugin {
    * @returns {Promise<void>} - 成功时 resolve，无返回值
    * @throws {Error} 当系统未就绪或参数缺失时抛出错误（Promise 将被 reject）
    */
-  loginLiveRoom({ sceneType, channelId }: LiveRoomParams): Promise<void> {
-    Logger.debug("loginLiveRoom", sceneType, channelId);
-    return new Promise((resolve, reject) => {
-      if (!this.envInit) {
-        reject(new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR));
-        return;
-      }
-      try {
-        this.checkSystem();
+  async loginLiveRoom({ sceneType, channelId }: LiveRoomParams): Promise<void> {
+    Logger.info("登录直播房间", sceneType, channelId);
+    this.ensureEnv();
+    this.checkSystem();
 
-        if (sceneType === undefined || channelId === undefined) {
-          throw new Error(ERROR_MESSAGES.ROOM_PARAMS_ERROR);
-        }
+    if (sceneType === undefined || channelId === undefined) {
+      throw new Error(ERROR_MESSAGES.ROOM_PARAMS_ERROR);
+    }
 
-        Logger.info("登录直播房间", { sceneType, channelId });
-        this.playModule.loginLiveRoom(
-          sceneType,
-          { channelId },
-          (result: any) => {
-            const { isSuccess, errMsg = "" } = result || {};
-            if (isSuccess) {
-              Logger.info("登录直播房间成功");
-              resolve();
-            } else {
-              Logger.error("登录直播房间失败", errMsg);
-              reject(errMsg);
-            }
-          }
-        );
-      } catch (error) {
-        Logger.error("登录直播房间失败", error);
-        reject(error);
-      }
-    });
+    Logger.info("登录直播房间", { sceneType, channelId });
+    try {
+      await this._promisify<void>((cb) =>
+        this.playModule.loginLiveRoom(sceneType, { channelId }, cb)
+      );
+      Logger.info("登录直播房间成功");
+    } catch (error) {
+      Logger.error("登录直播房间失败", error);
+      throw error;
+    }
   }
 
   /**
@@ -358,30 +348,27 @@ export class PLVLiveScenesPlugin {
    * @returns {Promise<void>} - 成功时 resolve，无返回值
    * @throws {Error} 当系统未就绪或必要参数缺失时抛出错误（Promise 将被 reject）
    */
-  loginPlaybackRoom({
+  async loginPlaybackRoom({
     sceneType,
     channelId,
     videoId,
     vodType,
   }: PlaybackRoomParams): Promise<void> {
     Logger.info("登录回放房间", { sceneType, channelId, videoId, vodType });
-    return new Promise((resolve, reject) => {
-      if (!this.envInit) {
-        reject(new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR));
-        return;
-      }
-      try {
-        this.checkSystem();
+    this.ensureEnv();
+    this.checkSystem();
 
-        if (
-          sceneType === undefined ||
-          channelId === undefined ||
-          vodType === undefined
-        ) {
-          throw new Error(ERROR_MESSAGES.ROOM_PARAMS_ERROR);
-        }
+    if (
+      sceneType === undefined ||
+      channelId === undefined ||
+      vodType === undefined
+    ) {
+      throw new Error(ERROR_MESSAGES.ROOM_PARAMS_ERROR);
+    }
 
-        Logger.info("登录回放房间", { sceneType, channelId, videoId, vodType });
+    Logger.info("登录回放房间", { sceneType, channelId, videoId, vodType });
+    try {
+      await this._promisify<void>((cb) =>
         this.playModule.loginPlaybackRoom(
           sceneType,
           {
@@ -389,39 +376,29 @@ export class PLVLiveScenesPlugin {
             videoId,
             vodType,
           },
-          (result: any) => {
-            const { isSuccess, errMsg = "" } = result || {};
-            if (isSuccess) {
-              Logger.info("登录回放房间成功");
-              resolve();
-            } else {
-              Logger.error("登录回放房间失败", errMsg);
-              reject(errMsg);
-            }
-          }
-        );
-      } catch (error) {
-        Logger.error("登录回放房间失败", error);
-        reject(error);
-      }
-    });
+          cb
+        )
+      );
+      Logger.info("登录回放房间成功");
+    } catch (error) {
+      Logger.error("登录回放房间失败", error);
+      throw error;
+    }
   }
 
   /**
    * 注册退出房间回调（仅 iOS 生效）
    *
-   * @param {(res: any) => void} [cb] - 退出房间后的回调（可选）
+   * @param {(res: NativeResult) => void} [cb] - 退出房间后的回调（可选）
    * @returns {void}
    */
-  logoutRoomMessage(cb?: (res: any) => void): void {
-    if (!this.envInit) {
-      throw new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR);
-    }
+  logoutRoomMessage(cb?: (res: NativeResult) => void): void {
+    this.ensureEnv();
+    Logger.info("当前系统os:", this.os);
+    Logger.info("非ios系统不注册退出房间回调");
+    if (this.os !== "ios") return;
     Logger.info("注册退出房间");
-    const { osName } = uni.getSystemInfoSync() || ({} as any);
-    Logger.info("当前系统os:", osName);
-    if (osName !== "ios") return;
-    this.playModule.setExitRoomCallback((res: any) => {
+    this.playModule.setExitRoomCallback((res: NativeResult) => {
       Logger.info("退出房间成功");
       cb && cb(res);
     });
@@ -434,9 +411,7 @@ export class PLVLiveScenesPlugin {
    */
   showFullScreenButtonOnIPad(): void {
     Logger.info("显示 iPad 全屏按钮");
-    if (!this.envInit) {
-      throw new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR);
-    }
+    this.ensureEnv();
     this.playModule.showFullScreenButtonOnIPad({ show: true });
   }
 }
@@ -446,4 +421,13 @@ export class PLVLiveScenesPlugin {
  *
  * @returns {PLVLiveScenesPlugin} 插件实例
  */
-export const PLVLiveScenesPluginHelper = () => new PLVLiveScenesPlugin();
+let pluginInstance: PLVLiveScenesPlugin | null = null;
+
+const getPluginInstance = (): PLVLiveScenesPlugin => {
+  if (!pluginInstance) {
+    pluginInstance = new PLVLiveScenesPlugin();
+  }
+  return pluginInstance;
+};
+
+export { getPluginInstance as PLVLiveScenesPluginHelper };

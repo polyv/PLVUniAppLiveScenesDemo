@@ -1,4 +1,13 @@
 //#region src/index.d.ts
+type NativeResult = {
+  isSuccess?: boolean;
+  errMsg?: string;
+  [k: string]: any;
+};
+declare const enum SceneType {
+  CloudClass = 1,
+  Shopping = 2,
+}
 /**
  * 观看者信息
  */
@@ -25,21 +34,18 @@ type UserInfo = {
  * 直播房间登录参数
  */
 type LiveRoomParams = {
-  sceneType: number;
+  sceneType: SceneType;
   channelId: string;
 };
 /**
  * 回放房间登录参数
  */
 type PlaybackRoomParams = {
-  sceneType: number;
+  sceneType: SceneType;
   channelId: string;
   videoId?: string;
   vodType: number | string;
 };
-/**
- * PLVLiveScenesPlugin 主类（与 Demo 中保持一致的 API）
- */
 /**
  * Polyv Live Scenes 辅助插件
  *
@@ -59,7 +65,19 @@ declare class PLVLiveScenesPlugin {
    * - 通过 uni.requireNativePlugin 绑定原生模块
    */
   constructor();
+  /**
+   * 将 uni-app 回调风格的 API 转换为 Promise
+   * @param action - 接受回调作为最后一个参数的函数
+   * @returns Promise
+   */
+  private _promisify;
   private init;
+  /**
+   * 环境就绪校验：仅允许在 uni-app App(iOS/Android) 模式下调用
+   *
+   * 抛出：RUNTIME_ENV_ERROR
+   */
+  private ensureEnv;
   /**
    * 设置观看者信息
    *
@@ -169,10 +187,10 @@ declare class PLVLiveScenesPlugin {
   /**
    * 注册退出房间回调（仅 iOS 生效）
    *
-   * @param {(res: any) => void} [cb] - 退出房间后的回调（可选）
+   * @param {(res: NativeResult) => void} [cb] - 退出房间后的回调（可选）
    * @returns {void}
    */
-  logoutRoomMessage(cb?: (res: any) => void): void;
+  logoutRoomMessage(cb?: (res: NativeResult) => void): void;
   /**
    * 在 iPad 显示全屏按钮
    *
@@ -180,11 +198,6 @@ declare class PLVLiveScenesPlugin {
    */
   showFullScreenButtonOnIPad(): void;
 }
-/**
- * 获取插件实例
- *
- * @returns {PLVLiveScenesPlugin} 插件实例
- */
-declare const PLVLiveScenesPluginHelper: () => PLVLiveScenesPlugin;
+declare const getPluginInstance: () => PLVLiveScenesPlugin;
 //#endregion
-export { LiveRoomParams, MarqueeConfig, PLVLiveScenesPlugin, PLVLiveScenesPluginHelper, PlaybackRoomParams, UserInfo, ViewerInfo };
+export { LiveRoomParams, MarqueeConfig, PLVLiveScenesPlugin, getPluginInstance as PLVLiveScenesPluginHelper, PlaybackRoomParams, UserInfo, ViewerInfo };
