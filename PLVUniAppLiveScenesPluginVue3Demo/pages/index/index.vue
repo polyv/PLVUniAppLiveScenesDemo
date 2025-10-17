@@ -108,20 +108,30 @@
 
 <script setup>
 import { ref, reactive, watch } from "vue";
-import { PLVLiveScenesPluginHelper } from "../../tools/plv-live-scense-plugin-helper";
-
+import { onShow } from "@dcloudio/uni-app";
+import { PLVLiveScenesPluginHelper } from "../../tools/plv-live-scense-plugin-helper.mjs";
 const plugin = PLVLiveScenesPluginHelper();
-
-const sceneType = ref(1); //场景类型 1云课堂场景, 2直播带货场景
-const playType = ref(0); //播放类型 0直播，1回放
-const isVideoList = ref(0); //回放中是否进入回放列表0回放视频 1回放列表
-const errorMsg = ref("");
-
 const liveInfo = reactive({
   channelId: "",
   userId: "",
   appId: "",
   appSecret: "",
+});
+
+const sceneType = ref(1); //场景类型 1云课堂场景, 2直播带货场景
+const playType = ref(0); //播放类型 0直播，1回放
+const isVideoList = ref(0); //回放中是否进入回放列表0回放视频 1回放列表
+const errorMsg = ref("");
+// 标识是否去了插件多场景
+const goWatch = ref(false);
+
+//
+onShow(() => {
+  // 判断是否从插件多场景返回
+  if (goWatch.value) {
+    console.log("从原生界面返回了，backVuePage:", goWatch.value);
+    goWatch.value = false;
+  }
 });
 
 const playbackInfo = reactive({
@@ -187,7 +197,8 @@ const setUserInfo = async () => {
 };
 
 const startLive = async () => {
-  console.log("Start live  " + JSON.stringify(liveInfo), playType.value);
+  // 进入直播时设置为true
+  goWatch.value = true;
   try {
     if (playType.value === 0) {
       // 直播
@@ -210,6 +221,8 @@ const startLive = async () => {
       vodType: isVideoList.value,
     });
   } catch (error) {
+    // 失败的时候设置为false
+    goWatch.value = false;
     errorMsg.value = error;
     uni.showModal({
       title: "发生错误",

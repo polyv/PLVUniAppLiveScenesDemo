@@ -165,8 +165,9 @@
 </template>
 
 <script>
-import { PLVLiveScenesPluginHelper } from "../../tools/plv-live-scense-plugin-helper";
+import { PLVLiveScenesPluginHelper } from "../../tools/plv-live-scense-plugin-helper.mjs";
 const plugin = PLVLiveScenesPluginHelper();
+
 
 export default {
   data() {
@@ -189,7 +190,7 @@ export default {
       },
       // 配置直播间用户信息
       viewerData: {
-        viewerId: "", //开发者自己用户系统的ID。如用户手机号码等唯一标识符
+        viewerId: `UniappDemo${Date.now()}`, //开发者自己用户系统的ID。如用户手机号码等唯一标识符
         viewerName: "UniappDemo用户",
         viewerAvatar:
           "https://img-cdn-qiniu.dcloud.net.cn/uploads/avatar/001/53/87/39_avatar_max.jpg",

@@ -8,4 +8,6 @@ export const enum ERROR_MESSAGES {
   VIEWER_PARAMS_ERROR = "viewerId、viewerName、viewerAvatar不能为空",
   USER_PARAMS_ERROR = "appId、userId、appSecret不能为空",
   ROOM_PARAMS_ERROR = "sceneType、channelId不能为空",
+
+  HOST_ROOM_PARAMS_ERROR = "channelId、password、nickname不能为空",
 }

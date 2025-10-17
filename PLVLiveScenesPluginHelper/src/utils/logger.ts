@@ -1,8 +1,3 @@
-/**
- * 轻量日志工具（无任何第三方依赖）
- * - 通过传入 name 作为模块名称前缀
- */
-
 export interface ILogger {
   /** 普通信息日志 */
   info: (message?: unknown, ...args: unknown[]) => void;
@@ -14,7 +9,6 @@ export interface ILogger {
   debug: (message?: unknown, ...args: unknown[]) => void;
 }
 
-/** 将 message 统一为字符串（优先使用 Error.message） */
 function toMessage(input: unknown): string {
   if (input instanceof Error) return input.message || String(input);
   if (typeof input === "string") return input;
@@ -25,10 +19,9 @@ function toMessage(input: unknown): string {
   }
 }
 
-/** 创建带模块名前缀的 Logger */
-export function createLogger(name: string): ILogger {
+export function createLogger(name: string, env: string): ILogger {
   // 在生产环境下，返回一个空实现的 logger，禁用所有日志输出
-  if (process.env.NODE_ENV === "production") {
+  if (env === "production") {
     const noop = () => {}; // 空操作函数
     return {
       info: noop,
@@ -59,5 +52,5 @@ export function createLogger(name: string): ILogger {
   return { info, warn, error, debug };
 }
 
-/** 默认导出：方便直接 import createLogger from '.../logger' */
+
 export default createLogger;
