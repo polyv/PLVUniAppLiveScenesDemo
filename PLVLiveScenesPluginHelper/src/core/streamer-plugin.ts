@@ -236,8 +236,10 @@ export class StreamerPlugin
   logoutRoomMessage(cb?: (res: NativeResult) => void): void {
     this.ensureEnv();
     this.logger.info("当前系统os:", this.os);
-    this.logger.warn("非ios系统不注册退出房间回调");
-    if (this.os !== "ios") return;
+    if (this.os !== "ios") {
+      this.logger.warn("非ios系统不注册退出房间回调");
+      return;
+    }
     this.logger.info("注册退出房间");
     this.playModule.setExitRoomCallback?.((res: NativeResult) => {
       this.logger.info("退出房间成功");
@@ -261,8 +263,10 @@ export class StreamerPlugin
    */
   async setScreenShareGroup(appGroup: string): Promise<void> {
     this.logger.info("设置屏幕共享组", appGroup);
-    this.logger.warn("非ios系统不设置屏幕共享组");
-    if (this.os !== "ios") return;
+    if (this.os !== "ios") {
+      this.logger.warn("非ios系统不设置屏幕共享组");
+      return;
+    }
     this.ensureEnv();
 
     if (!this.streamerConfigModule) {
@@ -288,8 +292,9 @@ export class StreamerPlugin
     this.ensureEnv();
 
     const { channelId, password, nickname } = params;
-    if (!password || !channelId || !nickname)
+    if (!password || !channelId) {
       throw new Error(ERROR_MESSAGES.HOST_ROOM_PARAMS_ERROR);
+    }
 
     if (!this.streamerPlayModule) {
       this.logger.error("主播播放模块不存在");

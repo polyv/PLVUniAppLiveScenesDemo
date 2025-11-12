@@ -5,19 +5,19 @@
 import createLogger, { ILogger } from "../utils/logger";
 import { ERROR_MESSAGES } from "../utils/const";
 import { PluginType, PluginModuleNames } from "../utils/native-modules";
-import { 
-  IWatchPlayModule, 
-  IWatchConfigModule, 
-  IStreamerConfigModule, 
-  IStreamerPlayModule 
+import {
+  IWatchPlayModule,
+  IWatchConfigModule,
+  IStreamerConfigModule,
+  IStreamerPlayModule,
 } from "../interfaces";
-import { 
-  PluginOptions, 
-  IBasePlugin, 
-  NativeResult, 
-  ViewerInfo, 
-  MarqueeConfig, 
-  UserInfo 
+import {
+  PluginOptions,
+  IBasePlugin,
+  NativeResult,
+  ViewerInfo,
+  MarqueeConfig,
+  UserInfo,
 } from "../types";
 
 // uni 全局（由 uni-app 提供）
@@ -27,12 +27,15 @@ declare const uni: any;
 /**
  * 基础插件抽象类
  */
-export abstract class BasePlugin<T extends PluginType = PluginType.LiveScenesPlugin> implements IBasePlugin<T> {
+export abstract class BasePlugin<
+  T extends PluginType = PluginType.LiveScenesPlugin
+> implements IBasePlugin<T>
+{
   protected playModule!: IWatchPlayModule;
   protected configModule!: IWatchConfigModule;
   protected streamerConfigModule!: IStreamerConfigModule;
   protected streamerPlayModule!: IStreamerPlayModule;
-  
+
   protected isInit = false;
   protected userinfoDone = false;
   protected os: string = "unknown";
@@ -43,7 +46,6 @@ export abstract class BasePlugin<T extends PluginType = PluginType.LiveScenesPlu
   public readonly env: string; // 默认为 development
   protected readonly logger: ILogger;
 
-  
   /**
    * 获取是否已初始化
    * @returns 是否已初始化
@@ -51,7 +53,7 @@ export abstract class BasePlugin<T extends PluginType = PluginType.LiveScenesPlu
   public get isInitialized(): boolean {
     return this.isInit;
   }
-  
+
   /**
    * 获取是否已设置用户信息
    * @returns 是否已设置用户信息
@@ -61,7 +63,8 @@ export abstract class BasePlugin<T extends PluginType = PluginType.LiveScenesPlu
   }
 
   constructor(options?: PluginOptions<T>) {
-    const { type = PluginType.LiveScenesPlugin as T, env = "development" } = options || {};
+    const { type = PluginType.LiveScenesPlugin as T, env = "development" } =
+      options || {};
     this.pluginType = type;
     this.env = env;
     this.logger = createLogger("PLVLiveScenesPluginHelper", this.env);
@@ -135,11 +138,6 @@ export abstract class BasePlugin<T extends PluginType = PluginType.LiveScenesPlu
     if (!this.envInit) {
       this.logger.error("运行环境错误：仅支持uni-app app模式");
       throw new Error(ERROR_MESSAGES.RUNTIME_ENV_ERROR);
-    }
-    // 防御：确保绑定后模块仍存在（某些热更新或释放情况下）
-    if (!this.playModule || !this.configModule) {
-      this.logger.error("原生模块不存在或已被释放，请重新初始化");
-      throw new Error("NATIVE_MODULE_MISSING");
     }
   }
 
